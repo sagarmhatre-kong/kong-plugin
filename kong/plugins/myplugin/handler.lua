@@ -23,6 +23,12 @@ local plugin = {
 -- before worker processes are forked. So anything you add here will run once,
 -- but be available in all workers.
 
+-- SAGAR_NOTES
+-- useful for:
+--   * Loading shared libraries or modules that all workers will need
+--   * Setting up global configuration that doesn't change
+--   * Initializing connection pools or shared resources
+--   * Performing expensive setup operations once instead of in each worker
 
 
 -- handles more initialization, but AFTER the worker process has been forked/created.
@@ -30,7 +36,7 @@ local plugin = {
 function plugin:init_worker()
 
   -- your custom code here
-  kong.log.debug("saying hi from the 'init_worker' handler")
+  kong.log.debug("[[init_worker]] handler (handles more initialization, but AFTER the worker process has been forked/created) ")
 
 end --]]
 
@@ -39,7 +45,7 @@ end --]]
 -- This can run in the `init_worker` or `timer` phase.
 -- @param configs table|nil A table with all the plugin configs of this plugin type.
 function plugin:configure(configs)
-  kong.log.notice("saying hi from the 'configure' handler, got ", (configs and #configs or 0)," configs")
+  kong.log.notice("[[configure]] plugin config changed, got ", (configs and #configs or 0)," configs")
 
   if configs == nil then
     return -- no configs, nothing to do
@@ -77,11 +83,28 @@ end --]]
 
 
 -- runs in the 'access_by_lua_block'
+-- The access phase is place to modify what gets sent to the upstream.
+
 function plugin:access(plugin_conf)
 
   -- your custom code here
+
+  kong.log.notice("[[access]] plugin config pretty print: ")
   kong.log.inspect(plugin_conf)   -- check the logs for a pretty-printed config!
+
+  -- we are adding a header to the request being sent to the upstream here
   kong.service.request.set_header(plugin_conf.request_header, "this is on a request")
+
+
+  -- we are adding the api_key to the request being sent to the upstream here
+  local api_key = plugin_conf.api_key
+  local api_key_value = kong.vault.get(api_key)
+  kong.service.request.set_header("x-api-key", api_key_value)
+
+  local request_body = kong.request.get_raw_body()
+  if request_body then
+    kong.log.debug(request_body)
+  end
 
 end --]]
 
@@ -95,22 +118,31 @@ function plugin:header_filter(plugin_conf)
 end --]]
 
 
---[[ runs in the 'body_filter_by_lua_block'
+-- runs in the 'body_filter_by_lua_block'
 function plugin:body_filter(plugin_conf)
 
   -- your custom code here
   kong.log.debug("saying hi from the 'body_filter' handler")
 
-end --]]
+  local body = kong.response.get_raw_body()
+
+  if body then
+    kong.log.debug(body)
+  end
 
 
---[[ runs in the 'log_by_lua_block'
+end --
+
+
+-- runs in the 'log_by_lua_block'
 function plugin:log(plugin_conf)
 
   -- your custom code here
   kong.log.debug("saying hi from the 'log' handler")
 
-end --]]
+ 
+
+end --
 
 
 -- return our plugin object

@@ -26,6 +26,12 @@ local schema = {
               default = 600,
               required = true,
               gt = 0, }}, -- adding a constraint for the value
+          {
+            api_key = {
+              type = "string",
+              required = true,
+            },
+          },
         },
         entity_checks = {
           -- add some validation rules across fields
@@ -38,5 +44,8 @@ local schema = {
     },
   },
 }
+
+kong.log.notice("[[schema.lua]] schema pretty print: ")
+kong.log.inspect(schema)
 
 return schema
